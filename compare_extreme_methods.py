@@ -8,12 +8,16 @@ Inputs:
 Outputs:
 - demo_out/method_comparison.csv
 - demo_out/fig_timeseries_vhub_compare.png
+- demo_out/fig_monthly_mean_vhub_compare.png
+- demo_out/fig_monthly_mean_ws100_validation.png
 - demo_out/fig_annual_maxima_compare.png
 - demo_out/fig_extrapolation_gap.png
 - demo_out/fig_extrapolation_means_bar.png
+- demo_out/fig_alpha_sensitivity.png
 - demo_out/fig_pot_mrl.png
 - demo_out/fig_return_levels.png
 - demo_out/method_interpretation.md
+- demo_out/extrapolation_notes.md
 """
 
 from __future__ import annotations
@@ -125,11 +129,45 @@ def fit_block_max_methods(annual_max: pd.Series, periods: list[int]) -> dict[str
     return out
 
 
+def alpha_sensitivity(
+    ws10: pd.Series, ws100: pd.Series, hub_height_m: float, alphas: list[float]
+) -> pd.DataFrame:
+    rows = []
+    for alpha in alphas:
+        from10 = 1.10 * ws10 * (hub_height_m / 10.0) ** alpha
+        from100 = 1.10 * ws100 * (hub_height_m / 100.0) ** alpha
+        rows.append(
+            {
+                "alpha": alpha,
+                "mean_vhub_from10": float(from10.mean()),
+                "mean_vhub_from100": float(from100.mean()),
+                "mean_abs_gap": float((from10 - from100).abs().mean()),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def validation_metrics(ws10: pd.Series, ws100: pd.Series, alpha: float) -> dict[str, float]:
+    ws100_from10 = ws10 * (100.0 / 10.0) ** alpha
+    err = ws100_from10 - ws100
+    return {
+        "mean_actual_ws100": float(ws100.mean()),
+        "mean_extrap_ws100_from10": float(ws100_from10.mean()),
+        "bias": float(err.mean()),
+        "mae": float(err.abs().mean()),
+        "rmse": float(np.sqrt((err.pow(2)).mean())),
+        "mape": float((err.abs() / ws100).mean() * 100.0),
+    }
+
+
 def save_plots(
     ts10: pd.Series,
     ts100: pd.Series,
+    ws10: pd.Series,
+    ws100: pd.Series,
     annual_max10: pd.Series,
     annual_max100: pd.Series,
+    sensitivity_df: pd.DataFrame,
     mrl: pd.DataFrame,
     methods_df: pd.DataFrame,
     out_dir: Path,
@@ -147,6 +185,35 @@ def save_plots(
     plt.grid(alpha=0.25)
     plt.tight_layout()
     plt.savefig(out_dir / "fig_timeseries_vhub_compare.png", dpi=180)
+    plt.close()
+
+    # Timeseries monthly means for a smoother comparison.
+    monthly_mean10 = ts10.resample("MS").mean()
+    monthly_mean100 = ts100.resample("MS").mean()
+    plt.figure(figsize=(11, 4))
+    plt.plot(monthly_mean10.index, monthly_mean10.values, lw=0.9, label="From 10 m")
+    plt.plot(monthly_mean100.index, monthly_mean100.values, lw=0.9, label="From 100 m")
+    plt.title("Monthly Mean of Area-Mean Hub-Height 10-min Wind")
+    plt.ylabel("Wind speed (m/s)")
+    plt.xlabel("Time")
+    plt.legend()
+    plt.grid(alpha=0.25)
+    plt.tight_layout()
+    plt.savefig(out_dir / "fig_monthly_mean_vhub_compare.png", dpi=180)
+    plt.close()
+
+    monthly_mean_ws100 = ws100.resample("MS").mean()
+    monthly_mean_ws100_from10 = (ws10 * (100.0 / 10.0) ** 0.11).resample("MS").mean()
+    plt.figure(figsize=(11, 4))
+    plt.plot(monthly_mean_ws100.index, monthly_mean_ws100.values, lw=0.9, label="Actual ERA5 100 m")
+    plt.plot(monthly_mean_ws100_from10.index, monthly_mean_ws100_from10.values, lw=0.9, label="10 m extrapolated to 100 m")
+    plt.title("Monthly Mean Validation: Actual 100 m vs 10 m Extrapolated to 100 m")
+    plt.ylabel("Wind speed (m/s)")
+    plt.xlabel("Time")
+    plt.legend()
+    plt.grid(alpha=0.25)
+    plt.tight_layout()
+    plt.savefig(out_dir / "fig_monthly_mean_ws100_validation.png", dpi=180)
     plt.close()
 
     # Annual maxima
@@ -189,6 +256,19 @@ def save_plots(
     plt.savefig(out_dir / "fig_extrapolation_means_bar.png", dpi=180)
     plt.close()
 
+    # Sensitivity of mean extrapolated wind to alpha.
+    plt.figure(figsize=(8, 4.5))
+    plt.plot(sensitivity_df["alpha"], sensitivity_df["mean_vhub_from10"], marker="o", label="From 10 m")
+    plt.plot(sensitivity_df["alpha"], sensitivity_df["mean_vhub_from100"], marker="o", label="From 100 m")
+    plt.title("Sensitivity of Mean Hub-Height Wind to Power-Law Exponent alpha")
+    plt.xlabel("alpha")
+    plt.ylabel("Mean hub-height 10-min wind (m/s)")
+    plt.legend()
+    plt.grid(alpha=0.25)
+    plt.tight_layout()
+    plt.savefig(out_dir / "fig_alpha_sensitivity.png", dpi=180)
+    plt.close()
+
     # Mean residual life plot
     if not mrl.empty:
         plt.figure(figsize=(8, 4))
@@ -223,6 +303,8 @@ def write_interpretation(
     ts10: pd.Series,
     ts100: pd.Series,
     annual_max: pd.Series,
+    sensitivity_df: pd.DataFrame,
+    validation: dict[str, float],
     threshold_q: float,
     threshold_u: float,
     n_peaks: int,
@@ -254,6 +336,14 @@ def write_interpretation(
         f"- Mean value from 100 m extrapolation: {ts100.mean():.2f} m/s.",
         f"- Mean absolute gap between the two hub-height series: {diff_abs.mean():.2f} m/s.",
         "",
+        "## Validation against actual ERA5 100 m wind",
+        "- A useful internal check is to extrapolate the 10 m wind only up to 100 m and compare it with the actual ERA5 100 m wind.",
+        f"- Mean actual ERA5 100 m wind: {validation['mean_actual_ws100']:.2f} m/s.",
+        f"- Mean 10 m extrapolated to 100 m: {validation['mean_extrap_ws100_from10']:.2f} m/s.",
+        f"- Bias of 10 m to 100 m extrapolation: {validation['bias']:.2f} m/s.",
+        f"- MAE: {validation['mae']:.2f} m/s, RMSE: {validation['rmse']:.2f} m/s, MAPE: {validation['mape']:.2f}%.",
+        "- If the 10 m based power-law extrapolation already overpredicts 100 m, that is evidence that the same setup may also overpredict 150 m relative to a 100 m based extrapolation.",
+        "",
         "## Five methods tested",
         "- `Gumbel_block_max`: EVT block-maxima model used in your target paper.",
         "- `GEV_block_max`: general EVT block-maxima model (includes Gumbel as a special case).",
@@ -281,9 +371,12 @@ def write_interpretation(
         "",
         "## How to explain these plots in slides",
         "- `fig_timeseries_vhub_compare.png`: shows whether the 10 m and 100 m based extrapolated series track each other closely through time.",
+        "- `fig_monthly_mean_vhub_compare.png`: shows the smoother background-level comparison between 10 m and 100 m based extrapolations.",
+        "- `fig_monthly_mean_ws100_validation.png`: checks whether the 10 m based power-law extrapolation reproduces the actual ERA5 100 m wind reasonably well.",
         "- `fig_annual_maxima_compare.png`: shows whether the block-maxima behavior changes materially depending on the source height.",
         "- `fig_extrapolation_gap.png`: shows how the difference between the two extrapolation paths changes over time.",
         "- `fig_extrapolation_means_bar.png`: gives the simplest overall comparison of the average extrapolated wind from 10 m versus 100 m.",
+        "- `fig_alpha_sensitivity.png`: shows how strongly the extrapolated hub-height mean depends on the assumed shear exponent alpha.",
         "- `fig_pot_mrl.png`: threshold diagnostic; near-linear segment supports POT modeling in that region.",
         "- `fig_return_levels.png`: visual method spread (model-form uncertainty), useful for justifying conservative vs data-efficient choices.",
         "",
@@ -307,6 +400,57 @@ def write_interpretation(
     (out_dir / "method_interpretation.md").write_text("\n".join(md), encoding="utf-8")
 
 
+def write_extrapolation_notes(
+    out_dir: Path, hub_height_m: float, baseline_alpha: float, sensitivity_df: pd.DataFrame, validation: dict[str, float]
+) -> None:
+    base_row = sensitivity_df.loc[np.isclose(sensitivity_df["alpha"], baseline_alpha)].iloc[0]
+    md = [
+        "# Extrapolation Formula Notes",
+        "",
+        "## Formula",
+        "- `U_hub = U_ref * (z_hub / z_ref)^alpha`",
+        "- `V_hub,10min = 1.10 * U_hub`",
+        "",
+        "## Meaning of each term",
+        "- `U_ref`: the known wind speed at the reference height from ERA5.",
+        "- `z_ref`: the height where that wind is measured, here either 10 m or 100 m.",
+        f"- `z_hub`: the turbine hub height, here {hub_height_m:.0f} m.",
+        "- `alpha`: the wind-shear exponent. It controls how quickly wind speed increases with height.",
+        "- `1.10`: the paper's conversion from 1-hour mean hub-height wind to 10-minute mean hub-height wind.",
+        "",
+        "## Intuition",
+        "- Wind is usually slower near the sea surface because of surface drag.",
+        "- As height increases, that drag influence weakens, so the mean wind speed usually increases.",
+        "- The exponent `alpha` controls the curvature of that increase.",
+        "- Smaller `alpha` means weaker shear and less change with height.",
+        "- Larger `alpha` means stronger shear and more amplification when extrapolating upward.",
+        "",
+        "## Why alpha = 0.11 in the paper?",
+        "- The paper explicitly uses `alpha = 0.11` as its baseline assumption.",
+        "- Their reason is consistency with the environmental model they use, which is defined using wind at 10 m above mean sea level.",
+        "- In offshore settings, vertical shear is often weaker than over land because the sea surface is aerodynamically smoother, so a relatively low exponent is common.",
+        "- For replication, using `alpha = 0.11` preserves consistency with the benchmark paper before introducing sensitivity tests.",
+        "",
+        "## How to judge whether 10 m or 100 m extrapolation is more accurate",
+        "- Because ERA5 gives both 10 m and 100 m winds, the first internal validation is to extrapolate 10 m up to 100 m and compare that against the actual ERA5 100 m wind.",
+        f"- For alpha={baseline_alpha:.2f}, the extrapolated 10 m to 100 m mean is {validation['mean_extrap_ws100_from10']:.2f} m/s, while the actual 100 m mean is {validation['mean_actual_ws100']:.2f} m/s.",
+        f"- The bias is {validation['bias']:.2f} m/s and the MAE is {validation['mae']:.2f} m/s.",
+        "- If the 10 m based extrapolation is already biased high at 100 m, that supports treating the 100 m based 150 m extrapolation as the more trustworthy of the two simple power-law estimates.",
+        "",
+        "## Why the 10 m based 150 m extrapolation is higher here",
+        "- The 10 m to 150 m extrapolation spans a much larger height ratio than the 100 m to 150 m extrapolation.",
+        "- With a positive alpha, the factor `(z_hub / z_ref)^alpha` grows as the vertical jump becomes larger.",
+        "- If alpha is even slightly too large for the real offshore shear, the 10 m based extrapolation will amplify that mismatch more strongly than the 100 m based extrapolation.",
+        "",
+        "## What the sensitivity test shows here",
+        f"- At alpha={baseline_alpha:.2f}, mean extrapolated `Vhub` from 10 m is {base_row['mean_vhub_from10']:.2f} m/s.",
+        f"- At alpha={baseline_alpha:.2f}, mean extrapolated `Vhub` from 100 m is {base_row['mean_vhub_from100']:.2f} m/s.",
+        "- The alpha-sensitivity plot shows that the 10 m based extrapolation is more sensitive to alpha than the 100 m based extrapolation, because it spans a larger vertical distance.",
+        "- That is one strong reason to compare 10 m and 100 m based extrapolations explicitly.",
+    ]
+    (out_dir / "extrapolation_notes.md").write_text("\n".join(md), encoding="utf-8")
+
+
 def main() -> None:
     args = parse_args()
     out_dir = Path(args.output_dir)
@@ -317,6 +461,12 @@ def main() -> None:
     ts10 = indexed["vhub_10min_from10_mean"].dropna()
     ts100 = indexed["vhub_10min_from100_mean"].dropna()
     ts = indexed[args.target_column].dropna()
+    ws10 = indexed["ws10_mean"].dropna()
+    ws100 = indexed["ws100_mean"].dropna()
+    alphas = [0.08, 0.10, 0.11, 0.14, 0.20]
+    sensitivity_df = alpha_sensitivity(ws10, ws100, hub_height_m=150.0, alphas=alphas)
+    sensitivity_df.to_csv(out_dir / "alpha_sensitivity.csv", index=False)
+    validation = validation_metrics(ws10, ws100, alpha=0.11)
 
     annual_max = ts.resample("YS").max().dropna()
     annual_max10 = ts10.resample("YS").max().dropna()
@@ -337,12 +487,14 @@ def main() -> None:
     methods_df.to_csv(out_dir / "method_comparison.csv", index=False)
 
     mrl = mrl_curve(ts)
-    save_plots(ts10, ts100, annual_max10, annual_max100, mrl, methods_df, out_dir)
+    save_plots(ts10, ts100, ws10, ws100, annual_max10, annual_max100, sensitivity_df, mrl, methods_df, out_dir)
     write_interpretation(
         out_dir,
         ts10,
         ts100,
         annual_max,
+        sensitivity_df,
+        validation,
         args.threshold_quantile,
         threshold_u,
         n_peaks,
@@ -350,9 +502,17 @@ def main() -> None:
         gpd_shape=gpd_params[0],
         target_column=args.target_column,
     )
+    write_extrapolation_notes(
+        out_dir,
+        hub_height_m=150.0,
+        baseline_alpha=0.11,
+        sensitivity_df=sensitivity_df,
+        validation=validation,
+    )
 
     print(f"[OK] wrote {out_dir / 'method_comparison.csv'}")
     print(f"[OK] wrote {out_dir / 'method_interpretation.md'}")
+    print(f"[OK] wrote {out_dir / 'extrapolation_notes.md'}")
     print(f"[OK] wrote plots in {out_dir}")
 
 

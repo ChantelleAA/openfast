@@ -15,6 +15,14 @@
 - Mean value from 100 m extrapolation: 11.55 m/s.
 - Mean absolute gap between the two hub-height series: 0.96 m/s.
 
+## Validation against actual ERA5 100 m wind
+- A useful internal check is to extrapolate the 10 m wind only up to 100 m and compare it with the actual ERA5 100 m wind.
+- Mean actual ERA5 100 m wind: 10.04 m/s.
+- Mean 10 m extrapolated to 100 m: 10.75 m/s.
+- Bias of 10 m to 100 m extrapolation: 0.71 m/s.
+- MAE: 0.84 m/s, RMSE: 0.97 m/s, MAPE: 9.76%.
+- If the 10 m based power-law extrapolation already overpredicts 100 m, that is evidence that the same setup may also overpredict 150 m relative to a 100 m based extrapolation.
+
 ## Five methods tested
 - `Gumbel_block_max`: EVT block-maxima model used in your target paper.
 - `GEV_block_max`: general EVT block-maxima model (includes Gumbel as a special case).
@@ -46,9 +54,12 @@
 
 ## How to explain these plots in slides
 - `fig_timeseries_vhub_compare.png`: shows whether the 10 m and 100 m based extrapolated series track each other closely through time.
+- `fig_monthly_mean_vhub_compare.png`: shows the smoother background-level comparison between 10 m and 100 m based extrapolations.
+- `fig_monthly_mean_ws100_validation.png`: checks whether the 10 m based power-law extrapolation reproduces the actual ERA5 100 m wind reasonably well.
 - `fig_annual_maxima_compare.png`: shows whether the block-maxima behavior changes materially depending on the source height.
 - `fig_extrapolation_gap.png`: shows how the difference between the two extrapolation paths changes over time.
 - `fig_extrapolation_means_bar.png`: gives the simplest overall comparison of the average extrapolated wind from 10 m versus 100 m.
+- `fig_alpha_sensitivity.png`: shows how strongly the extrapolated hub-height mean depends on the assumed shear exponent alpha.
 - `fig_pot_mrl.png`: threshold diagnostic; near-linear segment supports POT modeling in that region.
 - `fig_return_levels.png`: visual method spread (model-form uncertainty), useful for justifying conservative vs data-efficient choices.
 
