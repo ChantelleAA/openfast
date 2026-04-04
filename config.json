@@ -1,0 +1,28 @@
+{
+    "buoys": {
+        "M1":{
+            "longitude": -11.2000,
+            "latitude": 53.1266
+        },
+        "M2":{
+            "longitude": -5.4250,
+            "latitude": 53.4800
+        },
+        "M3":{
+            "longitude": -10.5500,
+            "latitude": 51.2166
+        },
+        "M4":{
+            "longitude": -10.0000,
+            "latitude": 55.0000
+        },
+        "M5":{
+            "longitude": -6.7040,
+            "latitude": 51.6900
+        },
+        "M6":{
+            "longitude": -15.9300,
+            "latitude": 53.0605
+        }
+    }
+}
