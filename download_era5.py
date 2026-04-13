@@ -10,6 +10,7 @@ import os
 import calendar
 import json
 import hashlib
+import zipfile
 from pathlib import Path
 import cdsapi
 
@@ -17,9 +18,9 @@ OUTDIR = "era5_out"
 os.makedirs(OUTDIR, exist_ok=True)
 
 # [North, West, South, East]
-AREA = [61.5, 0.0, 57.5, 4.0]
+AREA = [62.0, -18.0, 48.0, 5.0]
 
-YEARS = list(range(1950, 2026))
+YEARS = [1950] + list(range(2001, 2026))
 MONTHS = list(range(1, 13))
 TIMES = [f"{h:02d}:00" for h in range(24)]
 
@@ -55,6 +56,19 @@ def payload_hash(payload: dict) -> str:
 def cache_paths(target: Path) -> tuple[Path, Path]:
     return target.with_suffix(".tmp"), target.with_suffix(target.suffix + ".meta.json")
 
+def extracted_paths(stem: str, outdir: Path) -> tuple[Path, Path]:
+    return outdir / f"{stem}_oper.nc", outdir / f"{stem}_wave.nc"
+
+def extract_zip(zip_path: Path):
+    stem = zip_path.stem  # e.g. "era5_sl_1950_01"
+    oper_out, wave_out = extracted_paths(stem, zip_path.parent)
+    with zipfile.ZipFile(zip_path) as zf:
+        for name in zf.namelist():
+            dest = oper_out if "oper" in name else wave_out
+            with zf.open(name) as src, open(dest, "wb") as dst:
+                dst.write(src.read())
+    print(f"[UNZIP    ] {zip_path.name} -> {oper_out.name}, {wave_out.name}")
+
 def cache_hit(target: Path, meta_path: Path, expected_hash: str) -> bool:
     if not target.exists() or not meta_path.exists():
         return False
@@ -69,12 +83,14 @@ def cache_hit(target: Path, meta_path: Path, expected_hash: str) -> bool:
 def download_month(year: int, month: int):
     ndays = calendar.monthrange(year, month)[1]
     days = [f"{d:02d}" for d in range(1, ndays + 1)]
-    target = Path(OUTDIR) / f"era5_sl_{year}_{month:02d}.nc"
+    stem = f"era5_sl_{year}_{month:02d}"
+    target = Path(OUTDIR) / f"{stem}.nc"
     tmp_target, meta_path = cache_paths(target)
     payload = request_payload(year, month, days)
     req_hash = payload_hash(payload)
 
-    if cache_hit(target, meta_path, req_hash):
+    oper_out, wave_out = extracted_paths(stem, Path(OUTDIR))
+    if cache_hit(target, meta_path, req_hash) and oper_out.exists() and wave_out.exists():
         print(f"[CACHE HIT] {target}")
         return
 
@@ -85,6 +101,7 @@ def download_month(year: int, month: int):
         str(tmp_target),
     )
     os.replace(tmp_target, target)
+    extract_zip(target)
     meta = {
         "request_hash": req_hash,
         "year": year,

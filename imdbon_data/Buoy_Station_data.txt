@@ -1,0 +1,78 @@
+Station 62090 - M1 - 50 NM West of Aran Islands
+2.5-meter ODAS buoy
+53.127 N 11.200 W (53°7'36" N 11°12'0" W)
+
+Site elevation: sea level
+Air temp height: 3.8 m above site elevation
+Anemometer height: 4.5 m above site elevation
+Barometer elevation: 4.5 m above mean sea level
+Sea temp depth: 1 m below water line
+Water depth: 140 m
+
+
+
+Station 62091 - M2 - 20 NM East of Lambay
+2.5-meter ODAS buoy
+53.469 N 5.418 W (53°28'8" N 5°25'5" W)
+
+Site elevation: sea level
+Air temp height: 3.8 m above site elevation
+Anemometer height: 4.5 m above site elevation
+Barometer elevation: 4.5 m above mean sea level
+Sea temp depth: 1 m below water line
+Water depth: 95 m
+
+
+
+Station 62092 - M3 - 30 NM Southwest of Mizen Head
+2.5-meter ODAS buoy
+51.130 N 10.330 W (51°7'48" N 10°19'48" W)
+
+Site elevation: sea level
+Air temp height: 3.8 m above site elevation
+Anemometer height: 4.5 m above site elevation
+Barometer elevation: 4.5 m above mean sea level
+Sea temp depth: 1 m below water line
+Water depth: 155 m
+
+
+
+Station 62093 - M4 - Donegal Bay
+2.5-meter ODAS buoy
+55.000 N 10.000 W (55°0'0" N 10°0'0" W)
+
+Site elevation: sea level
+Air temp height: 3.8 m above site elevation
+Anemometer height: 4.5 m above site elevation
+Barometer elevation: 4.5 m above mean sea level
+Sea temp depth: 1 m below water line
+Water depth: 72 m
+
+
+
+
+Station 62094 - M5 - South East
+2.5-meter ODAS buoy
+51.410 N 6.420 W (51°24'36" N 6°25'12" W)
+
+Site elevation: sea level
+Air temp height: 3.8 m above site elevation
+Anemometer height: 4.5 m above site elevation
+Barometer elevation: 4.5 m above mean sea level
+Sea temp depth: 1 m below water line
+Water depth: 70 m
+
+
+
+
+Station 62095 - M6 - West Coast
+2.5-meter ODAS buoy
+53.040 N 15.530 W (53°2'24" N 15°31'48" W)
+
+Site elevation: sea level
+Air temp height: 3.8 m above site elevation
+Anemometer height: 4.5 m above site elevation
+Barometer elevation: 4.5 m above mean sea level
+Sea temp depth: 1 m below water line
+Water depth: 3000.1 m
+Watch circle radius: 7454 yards
